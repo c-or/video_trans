@@ -3,6 +3,7 @@ from moviepy.editor import *
 from multiprocessing import cpu_count
 import os
 from tqdm import tqdm
+from moviepy.video.io.preview import preview
 
 def clip_video(name):
     """
@@ -91,13 +92,42 @@ def splitVoice(name):
     """
     video = VideoFileClip(name)
     audio = video.audio
-    audio.write_audiofile('test.mp3')
+    # audio.write_audiofile('test.mp3')
 
+
+def sub_video(name,seg,gap):
+    clip = VideoFileClip(name)
+    duration, size = clip.duration, clip.size
+    print(duration)
+    step = int(duration/seg)
+    loc = 0
+    i = 0
+    while loc<duration-1:
+        i += 1
+        loc = step*i
+        clip1 = clip.cutout(loc,loc+gap)
+        clip = clip1
+    # preview(clip)
+    duration = clip.duration
+    print(duration)
+    return clip
+
+def modify_speed(clip,speed):
+    clip1 = clip.fl_time(lambda t: t*speed,apply_to=['mask','audio'])
+    clip1 = clip1.set_duration(clip.duration/speed)
+    return clip1
+
+def add_bkaudio(clip):
+    duration = clip.duration
+    audio_clip = AudioFileClip('./bksound/51miz-S276571-754C2178.mp3')
+    audio_clip = afx.audio_loop(audio_clip,duration=duration)
 
 if __name__ == '__main__':
-    print(cpu_count())
-    name = r'E:\PycharmProjects\TikTokDownload\Download\post\不会颠球\2022-04-04 21.25.57_听说被别人艾特看世界杯会获得三倍幸福___带你感受上世纪的足球魅力___世界杯的一幕幕经典画面你还记得吗__#历届世界杯主题曲_#经典_#2010世界杯__#卡塔尔世界杯_#足球的魅力_#音乐_#足球_.mp4'
-    splitVoice(name)
-    # clip_video(name)
-    # imgToVideo()
-    # imgToVideoForDel(10)
+    name = r'D:\py_project\TikTokDownload\Download\post\张非人\2022-11-08 19.05.03农村田间做个蒜蓉猪肺培根卷_大片猪肺真的美味解馋_DOU_小助手__抖音小助手_#抖音美食创作者_#户外美食.mp4'
+    clip = sub_video(name,20,0.1)
+    print(clip.duration)
+    # clip.write_videofile('test.mp4',threads=4)
+    clip = modify_speed(clip,0.9)
+    print(clip.duration)
+    clip.write_videofile('test1.mp4',threads=4)
+    clip.close()
