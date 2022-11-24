@@ -113,21 +113,46 @@ def sub_video(name,seg,gap):
     return clip
 
 def modify_speed(clip,speed):
+    """
+    调整视频倍速
+    :param clip: 视频切片
+    :param speed: 速度倍数
+    :return: 返回处理后的视频
+    """
     clip1 = clip.fl_time(lambda t: t*speed,apply_to=['mask','audio'])
     clip1 = clip1.set_duration(clip.duration/speed)
     return clip1
 
-def add_bkaudio(clip):
+def add_bkaudio(clip,factor):
+    """
+    在视频原声中混入白噪音
+    :param clip: 需要混音的视频
+    :param factor: 白噪声的音量系数
+    """
     duration = clip.duration
+    src_audio = clip.audio
+    fps = src_audio.fps
     audio_clip = AudioFileClip('./bksound/51miz-S276571-754C2178.mp3')
     audio_clip = afx.audio_loop(audio_clip,duration=duration)
+    audio_clip = audio_clip.volumex(factor)
+    mix_audio = CompositeAudioClip([src_audio,audio_clip])
+    mix_audio = mix_audio.set_fps(fps)
+    clip = clip.set_audio(mix_audio)
+    return clip
+    # clip.write_videofile('test1.mp4',threads=16)
+    # mix_audio.write_audiofile('test.mp3',fps=fps)
+
 
 if __name__ == '__main__':
-    name = r'D:\py_project\TikTokDownload\Download\post\张非人\2022-11-08 19.05.03农村田间做个蒜蓉猪肺培根卷_大片猪肺真的美味解馋_DOU_小助手__抖音小助手_#抖音美食创作者_#户外美食.mp4'
+    name = r'E:\PycharmProjects\TikTokDownload\Download\post\张非人\2021-12-10 20.53.12卤好的猪蹄_上烤架烤_刷一层蒜蓉辣椒酱_再撒上一把孜然辣椒面_馋不馋_福原爱_AiFukuhara_DOU_小助手__#全网美食达人投喂福原爱_#抖音美食创作者_#户外美食_.mp4'
     clip = sub_video(name,20,0.1)
-    print(clip.duration)
-    # clip.write_videofile('test.mp4',threads=4)
-    clip = modify_speed(clip,0.9)
-    print(clip.duration)
-    clip.write_videofile('test1.mp4',threads=4)
-    clip.close()
+    # print(clip.duration)
+    # # clip.write_videofile('test.mp4',threads=4)
+    # clip = modify_speed(clip,0.9)
+    # print(clip.duration)
+    # clip.write_videofile('test1.mp4',threads=4)
+    # clip.close()
+    clip = add_bkaudio(clip,1)
+    clip = clip.add_mask().fx(vfx.colorx,1.2).fx(vfx.fadein,5).fx(vfx.fadeout,5)
+    clip.write_videofile('test1.mp4',threads=8)
+
