@@ -4,6 +4,7 @@ from multiprocessing import cpu_count
 import os
 from tqdm import tqdm
 from moviepy.video.io.preview import preview
+from moviepy.video.tools.drawing import circle
 
 def clip_video(name):
     """
@@ -144,7 +145,7 @@ def add_bkaudio(clip,factor):
 
 
 if __name__ == '__main__':
-    name = r'E:\PycharmProjects\TikTokDownload\Download\post\张非人\2021-12-10 20.53.12卤好的猪蹄_上烤架烤_刷一层蒜蓉辣椒酱_再撒上一把孜然辣椒面_馋不馋_福原爱_AiFukuhara_DOU_小助手__#全网美食达人投喂福原爱_#抖音美食创作者_#户外美食_.mp4'
+    name = r'D:\py_project\TikTokDownload\Download\post\张非人\2022-11-08 19.05.03农村田间做个蒜蓉猪肺培根卷_大片猪肺真的美味解馋_DOU_小助手__抖音小助手_#抖音美食创作者_#户外美食.mp4'
     clip = sub_video(name,20,0.1)
     # print(clip.duration)
     # # clip.write_videofile('test.mp4',threads=4)
@@ -152,7 +153,14 @@ if __name__ == '__main__':
     # print(clip.duration)
     # clip.write_videofile('test1.mp4',threads=4)
     # clip.close()
+    # 遮罩应该是一个类似于基座的东西，将视频放在上面，视频的可见范围就会随着基座的变化而变化
+    # 而不是一个类似蒙版一样放在放在上面的东西
     clip = add_bkaudio(clip,1)
-    clip = clip.add_mask().fx(vfx.colorx,1.2).fx(vfx.fadein,5).fx(vfx.fadeout,5)
+    clip = clip.fx(vfx.colorx,1.1).fx(vfx.fadein,5).fx(vfx.fadeout,5)
+    # clip.write_videofile('test1.mp4',threads=8)
+    # VideoClip().without_audio
+    clip_mask = clip.copy().rotate(180).set_opacity(0.2).without_audio()
+    clip = CompositeVideoClip([clip,clip_mask])
     clip.write_videofile('test1.mp4',threads=8)
+
 
