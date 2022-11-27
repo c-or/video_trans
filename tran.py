@@ -115,6 +115,7 @@ def sub_video(name,seg,gap):
         loc = step*i
         clip1 = clip.cutout(loc,loc+gap)
         clip = clip1
+        duration = clip.duration
     # preview(clip)
     clip = clip.subclip(gap*2,clip.duration-gap*2)
     duration = clip.duration
@@ -249,8 +250,9 @@ def schedule(item,dir,dest_dir):
 
         clip.close()
     except Exception as e:
-        clip.close()
         print(e)
+        clip.close()
+
 
 if __name__ == '__main__':
     dir = 'E:\PycharmProjects\TikTokDownload\Download\post\米其林🤏🏻未认证西点师'
