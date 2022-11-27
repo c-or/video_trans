@@ -1,3 +1,5 @@
+import random
+import time
 import cv2
 from moviepy.editor import *
 from multiprocessing import cpu_count
@@ -5,6 +7,11 @@ import os
 from tqdm import tqdm
 from moviepy.video.io.preview import preview
 from moviepy.video.tools.drawing import circle
+import youdao
+import os
+import itertools
+import hashlib
+import connector
 
 def clip_video(name):
     """
@@ -99,7 +106,7 @@ def splitVoice(name):
 def sub_video(name,seg,gap):
     clip = VideoFileClip(name)
     duration, size = clip.duration, clip.size
-    print(duration)
+    # print(duration)
     step = int(duration/seg)
     loc = 0
     i = 0
@@ -109,8 +116,9 @@ def sub_video(name,seg,gap):
         clip1 = clip.cutout(loc,loc+gap)
         clip = clip1
     # preview(clip)
+    clip = clip.subclip(gap*2,clip.duration-gap*2)
     duration = clip.duration
-    print(duration)
+    # print(duration)
     return clip
 
 def modify_speed(clip,speed):
@@ -143,24 +151,116 @@ def add_bkaudio(clip,factor):
     # clip.write_videofile('test1.mp4',threads=16)
     # mix_audio.write_audiofile('test.mp3',fps=fps)
 
+def color(clip,rx,fade):
+    clip = clip.fx(vfx.colorx,rx).fx(vfx.fadein,fade).fx(vfx.fadeout,fade)
+    return clip
+
+def add_mask(clip,text,size) -> VideoClip:
+    clip_mask = (TextClip(text, fontsize=size)
+                 # .set_position(lambda t: (150 * t, 50 * t))  # 随着时间移动
+                 .set_position('center')  # 水印的位置
+                 .set_duration(clip.duration)  # 水印持续时间
+                 .set_opacity(0.1))
+    clip = CompositeVideoClip([clip, clip_mask])
+    return clip
+
+def get_name(dir):
+    path = dir
+    file_name_list = os.listdir(path)
+    file_name = str(file_name_list)
+    file_names = file_name.replace("[", "").replace("]", "").replace("'", "").split(',')
+    return file_names
+
+def random_factor(num):
+
+    seg = [20,30,40,50,60]
+    gap = [0.06,0.08,0.1,0.12]
+    speed = [0.9,0.95,1,1.05,1.1]
+    volume = [0.2,0.3,0.4]
+    rx = [0.95,1,1.05]
+    fade = [2,3,4,5]
+    text_size = [100,110,120,130,140,150]
+    factors = list(itertools.product(seg,gap,speed,volume,rx,fade,text_size))
+    # print(len(factors))
+    factors = random.sample(factors,num)
+    return factors
+
+def mix_file_factor(files,num):
+    file_factors = []
+    for file in files:
+        salt = time.time_ns()
+        salt_parent_name = str(salt) + file
+        # 有中文所以需要编码
+        parent_name_md5 = hashlib.md5(salt_parent_name.encode()).hexdigest()
+        factors = random_factor(num)
+        a = [(file,parent_name_md5)]
+        file_factors += list(itertools.product(a,factors))
+    return file_factors
+
+def db_insert(fields,data_list):
+    db = connector.mysql_conn()
+    db.insert('tk_video_info', fields, data_list)
+
+def schedule(item,dir,dest_dir):
+    try:
+        file = item[0][0].strip()
+        parent_name_md5 = item[0][1]
+        path = dir+'\\'+file
+        factors = item[1]
+
+        suffix = '_'.join([str(x) for x in factors])
+        tip = file.index('#')
+        name_zh = file[19:tip]
+
+        salt = time.time_ns()
+        name_en = youdao.youdao(name_zh.replace('_',''))
+        name = name_zh+suffix
+        salt_child_name = str(salt)+name
+        # 有中文所以需要编码
+        child_name_md5 = hashlib.md5(salt_child_name.encode()).hexdigest()
+        seg = factors[0]
+        gap = factors[1]
+        speed = factors[2]
+        volume = factors[3]
+        rx = factors[4]
+        fade = factors[5]
+        text_size = factors[6]
+        text = time.strftime('%Y%m%d')
+        clip = sub_video(path,seg,gap)
+        clip = modify_speed(clip,speed)
+        clip = add_bkaudio(clip,volume)
+        clip = color(clip,rx,fade)
+        clip = add_mask(clip,text,text_size)
+        clip.write_videofile('./out/'+name+'.mp4')
+        # now = time.strftime('%Y-%m-%d %H:%M:%S')
+        meta_uuid = parent_name_md5
+        uuid = child_name_md5
+        meta_flag = 0
+        operation_type = '美食'
+        video_path = dest_dir+'\\'+name+'.mp4'
+        title = name_en
+        tags = 'food'
+        description = None
+        state = 1
+        prority = 0
+        data = [meta_uuid,uuid,meta_flag,operation_type,video_path,title,tags,description,state,prority]
+        fields =['meta_uuid','uuid','meta_flag','operation_type','video_path','title','tags','description','state','priority']
+        db_insert(fields,data)
+
+        clip.close()
+    except Exception as e:
+        clip.close()
+        print(e)
 
 if __name__ == '__main__':
-    name = r'D:\py_project\TikTokDownload\Download\post\张非人\2022-11-08 19.05.03农村田间做个蒜蓉猪肺培根卷_大片猪肺真的美味解馋_DOU_小助手__抖音小助手_#抖音美食创作者_#户外美食.mp4'
-    clip = sub_video(name,20,0.1)
-    # print(clip.duration)
-    # # clip.write_videofile('test.mp4',threads=4)
-    # clip = modify_speed(clip,0.9)
-    # print(clip.duration)
-    # clip.write_videofile('test1.mp4',threads=4)
-    # clip.close()
-    # 遮罩应该是一个类似于基座的东西，将视频放在上面，视频的可见范围就会随着基座的变化而变化
-    # 而不是一个类似蒙版一样放在放在上面的东西
-    clip = add_bkaudio(clip,1)
-    clip = clip.fx(vfx.colorx,1.1).fx(vfx.fadein,5).fx(vfx.fadeout,5)
-    # clip.write_videofile('test1.mp4',threads=8)
-    # VideoClip().without_audio
-    clip_mask = clip.copy().rotate(180).set_opacity(0.2).without_audio()
-    clip = CompositeVideoClip([clip,clip_mask])
-    clip.write_videofile('test1.mp4',threads=8)
+    dir = 'E:\PycharmProjects\TikTokDownload\Download\post\米其林🤏🏻未认证西点师'
+    dest_dir = r'F:\creat_video\yanse\20221117\美食'
+    files = get_name(dir)
+    file_factors = mix_file_factor(files,50)
+    # file_factors = zip_file_factor(file_factors,dir,dest_dir)
+    for item in file_factors:
+        schedule(item,dir,dest_dir)
+
+
 
 
