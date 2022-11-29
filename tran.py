@@ -12,6 +12,7 @@ import os
 import itertools
 import hashlib
 import connector
+import shutil
 
 def clip_video(name):
     """
@@ -107,15 +108,18 @@ def sub_video(name,seg,gap):
     clip = VideoFileClip(name)
     duration, size = clip.duration, clip.size
     # print(duration)
-    step = int(duration/seg)
-    loc = 0
+    step = duration/seg
+    if duration<20 and gap>0.06:
+        gap = 0.02
+    loc = 1.0
     i = 0
-    while loc<duration-1:
-        i += 1
+    while loc<duration-step:
+        i += 1.0
         loc = step*i
         clip1 = clip.cutout(loc,loc+gap)
         clip = clip1
         duration = clip.duration
+        print(loc,duration)
     # preview(clip)
     clip = clip.subclip(gap*2,clip.duration-gap*2)
     duration = clip.duration
@@ -161,7 +165,7 @@ def add_mask(clip,text,size) -> VideoClip:
                  # .set_position(lambda t: (150 * t, 50 * t))  # 随着时间移动
                  .set_position('center')  # 水印的位置
                  .set_duration(clip.duration)  # 水印持续时间
-                 .set_opacity(0.1))
+                 .set_opacity(0.06))
     clip = CompositeVideoClip([clip, clip_mask])
     return clip
 
@@ -188,6 +192,7 @@ def random_factor(num):
 
 def mix_file_factor(files,num):
     file_factors = []
+    parent_tips = []
     for file in files:
         salt = time.time_ns()
         salt_parent_name = str(salt) + file
@@ -196,23 +201,33 @@ def mix_file_factor(files,num):
         factors = random_factor(num)
         a = [(file,parent_name_md5)]
         file_factors += list(itertools.product(a,factors))
-    return file_factors
+        parent_tips += a
+    return file_factors,parent_tips
 
 def db_insert(fields,data_list):
     db = connector.mysql_conn()
     db.insert('tk_video_info', fields, data_list)
 
-def schedule(item,dir,dest_dir):
+def schedule(item,dir,dest_dir,operation_type,tags):
     try:
         file = item[0][0].strip()
         parent_name_md5 = item[0][1]
         path = dir+'\\'+file
         factors = item[1]
-
         suffix = '_'.join([str(x) for x in factors])
-        tip = file.index('#')
-        name_zh = file[19:tip]
-
+        try:
+            tip = file.index('#')
+        except:
+            tip = -4
+        if tip == 19:
+            file1 = file[20:]
+            try:
+                tip = file1.index('#')
+                name_zh = file1[:tip]
+            except:
+                name_zh = file1[:-4]
+        else:
+            name_zh = file[19:tip]
         salt = time.time_ns()
         name_en = youdao.youdao(name_zh.replace('_',''))
         name = name_zh+suffix
@@ -232,36 +247,71 @@ def schedule(item,dir,dest_dir):
         clip = add_bkaudio(clip,volume)
         clip = color(clip,rx,fade)
         clip = add_mask(clip,text,text_size)
-        clip.write_videofile('./out/'+name+'.mp4')
+        clip.write_videofile('./out/'+name+'.mp4',threads=16)
         # now = time.strftime('%Y-%m-%d %H:%M:%S')
         meta_uuid = parent_name_md5
         uuid = child_name_md5
         meta_flag = 0
-        operation_type = '美食'
+        # operation_type = '美食'
         video_path = dest_dir+'\\'+name+'.mp4'
         title = name_en
-        tags = 'food'
+        # tags = 'food'
         description = None
         state = 1
-        prority = 0
-        data = [meta_uuid,uuid,meta_flag,operation_type,video_path,title,tags,description,state,prority]
+        priority = 0
+        data = [meta_uuid,uuid,meta_flag,operation_type,video_path,title,tags,description,state,priority]
         fields =['meta_uuid','uuid','meta_flag','operation_type','video_path','title','tags','description','state','priority']
         db_insert(fields,data)
-
         clip.close()
     except Exception as e:
         print(e)
         clip.close()
 
+def parent_operation(dir,dest_dir,dest_local,parent_tips,operation_type,tags):
+    for parent_tip in parent_tips:
+        file = parent_tip[0].strip()
+        try:
+            tip = file.index('#')
+        except:
+            tip = -4
+        if tip == 19:
+            file1 = file[20:]
+            try:
+                tip = file1.index('#')
+                name_zh = file1[:tip]
+            except:
+                name_zh = file1[:-4]
+        else:
+            name_zh = file[19:tip]
+        name_en = youdao.youdao(name_zh.replace('_', ''))
+        uuid = parent_tip[1]
+        old_path = dir+'\\'+file
+        new_path = dest_local+'\\'+name_zh+'.mp4'
+        shutil.copyfile(old_path,new_path)
+        meta_uuid = None
+        meta_flag = 1
+        # operation_type = '美食'
+        video_path = dest_dir + '\\' + name_zh + '.mp4'
+        title = name_en
+        # tags = 'food'
+        description = None
+        state = 1
+        priority = 0
+        data = [meta_uuid,uuid,meta_flag,operation_type,video_path,title,tags,description,state,priority]
+        fields =['meta_uuid','uuid','meta_flag','operation_type','video_path','title','tags','description','state','priority']
+        db_insert(fields, data)
 
 if __name__ == '__main__':
-    dir = 'E:\PycharmProjects\TikTokDownload\Download\post\米其林🤏🏻未认证西点师'
-    dest_dir = r'F:\creat_video\yanse\20221117\美食'
+    operation_type = '衣服'
+    tags = 'food'
+    dir = r'E:\PycharmProjects\TikTokDownload\Download\post\安安原创设计'
+    dest_local = r'E:\PycharmProjects\video_trans\out'
+    dest_dir = r'F:\creat_video\yanse\20221117\衣服'
     files = get_name(dir)
-    file_factors = mix_file_factor(files,50)
-    # file_factors = zip_file_factor(file_factors,dir,dest_dir)
+    file_factors,parent_tips = mix_file_factor(files,50)
+    parent_operation(dir, dest_dir,dest_local, parent_tips,operation_type,tags)
     for item in file_factors:
-        schedule(item,dir,dest_dir)
+        schedule(item,dir,dest_dir,operation_type,tags)
 
 
 

@@ -16,20 +16,19 @@ class mysql_conn():
         self.cursor = self.conn.cursor()
 
     def insert_many(self,table,fields,data):
-        print('\n数据写入开始'+'-'*10)
-        print('数据大小：{}'.format(getsizeof(data)/(1024**2)))
-        time1 = datetime.datetime.now()
+        # print('\n数据写入开始'+'-'*10)
+        # print('数据大小：{}'.format(getsizeof(data)/(1024**2)))
+        # time1 = datetime.datetime.now()
         sql = 'insert into {}({}) values({});'.format(table,','.join(fields),','.join(['%s' for i in range(len(data[0]))]))
         num = len(data)
         self.cursor.executemany(sql,data)
         self.conn.commit()
-        time2 = datetime.datetime.now()
-        time3 = (time2-time1).seconds
-        time3 = 1 if time3==0 else time3
+        # time2 = datetime.datetime.now()
+        # time3 = (time2-time1).seconds
+        # time3 = 1 if time3==0 else time3
         self.conn.close()
-
-        speed = num/time3
-        print('写入速度为：{}条/秒'.format(speed))
+        # speed = num/time3
+        # print('写入速度为：{}条/秒'.format(speed))
 
 
     def insert(self,table,fields,data):
@@ -43,7 +42,6 @@ class mysql_conn():
         time2 = datetime.datetime.now()
         time3 = (time2-time1).seconds
         time3 = 1 if time3==0 else time3
-        self.conn.close()
         speed = num/time3
         print('写入速度为：{}条/秒'.format(speed))
 # db = mysql_conn()
